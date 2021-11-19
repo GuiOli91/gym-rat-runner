@@ -9,8 +9,6 @@ MOVE_REWARD = -1
 HUNTER_REWARD = -300
 TARGET_REWARD = 25
 
-
-
 class OpenEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
@@ -72,6 +70,7 @@ class OpenEnv(gym.Env):
 
       if obs['distanceEnemy'] == [0,0]:
           self.reward += HUNTER_REWARD
+          self.done = True
       if obs['distanceTarget'] == [0,0]:
           self.reward += TARGET_REWARD
           self.done = True
