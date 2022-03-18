@@ -75,8 +75,6 @@ class Rat(pg.sprite.Sprite):
         if not np.isnan(sel):
             self.image = self.images[sel]
 
-
-
 class Cat(pg.sprite.Sprite):
     """Represents the Enemy as a cat trying to catch the rat"""
 
@@ -88,7 +86,6 @@ class Cat(pg.sprite.Sprite):
 
         self.image = pg.transform.scale(self.images[0], (UNIT_WIDTH, UNIT_HEIGHT))
         self.rect = self.image.get_rect(topright=SCREENRECT.center)
-
 
 class Cheese(pg.sprite.Sprite):
     """Represents the Target for the rat"""
@@ -113,7 +110,6 @@ class Wall(pg.sprite.Sprite):
 
         self.image = pg.transform.scale(self.images[0], (UNIT_WIDTH, UNIT_HEIGHT))
         self.rect = self.image.get_rect(topleft = pos)
-
 
 class Score(pg.sprite.Sprite):
     """Display the Score on the screen ."""
