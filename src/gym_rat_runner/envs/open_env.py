@@ -2,10 +2,13 @@ import gym
 from gym import error, spaces, utils
 from gym.utils import seeding
 from collections import OrderedDict
+import pandas as pd
 import numpy as np
 import os
-import pandas as pd
-import pygame as pg
+import glob
+import time
+
+import cv2 as cv
 
 SPACES = 10
 MOVE_REWARD = -1
@@ -15,25 +18,24 @@ TARGET_REWARD = 25
 # Screen constants
 
 HEIGHT, WIDTH = 720, 720
-UNIT_HEIGHT, UNIT_WIDTH = HEIGHT//(SPACES+2), WIDTH//(SPACES+2)
-SCREENRECT = pg.Rect(0, 0, WIDTH, HEIGHT)
+UHEIGHT, UWIDTH = HEIGHT//(SPACES+2), WIDTH//(SPACES+2)
 SCORE = 0
 DARK_GREEN = (21, 89, 33)
 MAZE_FILE = "Open_Maze.csv"
 
+#Text parameters
+
+font                    = cv.FONT_HERSHEY_SIMPLEX
+bottomLeftCornerOfText  = (10,HEIGHT-UHEIGHT//2)
+fontScale               = 0.5
+fontColor               = (255,255,255)
+thickness               = 2
+lineType                = 2
+
 main_dir = os.path.abspath(os.path.join(os.path.split(os.path.abspath(__file__))[0], os.pardir))
 
-def load_image(file):
-    """loads an image, prepares the Visualization"""
-    file = os.path.join(main_dir, "images", file)
-    try:
-        surface = pg.image.load(file)
-    except pg.error:
-        raise SystemExit('Could not load image "%s" %s' % (file, pg.get_error()))
-    return surface.convert()
-
 class OpenEnv(gym.Env):
-    metadata = {'render.modes': ['human']}
+    metadata = {'render.modes': ['human', 'video']}
     renderinit = False
     screen = None
 
@@ -85,20 +87,105 @@ class OpenEnv(gym.Env):
         self.width = width
         self.height = height
 
+        # Load Maze
+        maze_file = os.path.join(main_dir, 'envs', 'maze', MAZE_FILE)
+        self.maze = pd.read_csv(maze_file, header = None)
+
+        #Load Images
+        pathimages = os.path.join(main_dir, 'images', '*.png')
+
+        self.images = {}
+        for file in glob.glob(pathimages):
+            figname = os.path.split(file)[1][:-4]
+            self.images[figname] = cv.imread(file, cv.IMREAD_UNCHANGED)
+            self.images[figname] = cv.resize(self.images[figname], (UHEIGHT, UWIDTH), interpolation = cv.INTER_AREA)
+
+        self.frames = []
 
         self.target =  None
         self.player = None
         self.hunter = None
 
+        self.action = None
         self.reward = 0
         self.done = False
         self.info = {}
-        self.action_space = spaces.Discrete(4)
+        self.action_space = spaces.Discrete(8)
         self.observation_space = spaces.Dict({
         'distanceTarget': spaces.Box(low=-SPACES + 1, high=SPACES - 1, shape=(2,), dtype=np.int32),
         'distanceEnemy':spaces.Box(low=-SPACES + 1, high=SPACES - 1, shape=(2,), dtype=np.int32)})
         self.isrendering = False
         self.deterministic = True
+
+    def __overlay_image(img, img_overlay, x, y):
+        """Overlay `img_overlay` onto `img` at (x, y) and blend using the alpha on boths images.
+
+        """
+        # Image ranges
+        y1, y2 = max(0, y), min(img.shape[0], y + img_overlay.shape[0])
+        x1, x2 = max(0, x), min(img.shape[1], x + img_overlay.shape[1])
+
+        # Overlay ranges
+        y1o, y2o = max(0, -y), min(img_overlay.shape[0], img.shape[0] - y)
+        x1o, x2o = max(0, -x), min(img_overlay.shape[1], img.shape[1] - x)
+
+        # Exit if nothing to do
+        if y1 >= y2 or x1 >= x2 or y1o >= y2o or x1o >= x2o:
+            return
+
+        # Blend overlay within the determined ranges
+        img_crop = img[y1:y2, x1:x2]
+        img_overlay_crop = img_overlay[y1o:y2o, x1o:x2o]
+
+        alphaoverlay = img_overlay[y1o:y2o, x1o:x2o, 3]/255.0
+        alphaunderlay = 1 - alphaoverlay
+
+        for color in range(3):
+            img_crop[:,:,color] = (alphaoverlay*img_overlay_crop[:,:,color] +
+                                    alphaunderlay*img_crop[:,:,color])
+
+    def __rotate_image(image, angle):
+        image_center = tuple(np.array(image.shape[1::-1]) / 2)
+        rot_mat = cv.getRotationMatrix2D(image_center, angle, 1.0)
+        result = cv.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv.INTER_LINEAR)
+        return result
+
+    def __generateframe(self):
+
+        frame = np.zeros((HEIGHT,WIDTH,4), np.uint8)
+        frame[:] = (21, 89, 33, 255)
+
+        for i in range(self.maze.shape[0]):
+            for j in range(self.maze.shape[1]):
+                if self.maze.iloc[i,j] == 1:
+                    OpenEnv.__overlay_image(frame, self.images['wall'], i*UWIDTH, j*UHEIGHT)
+
+        # Expected Actions:
+        # 0: Right movement
+        # 1: Up-Right movement
+        # 2: Up movement
+        # 3: Up-Left movement
+        # 4: Left movement
+        # 5: Down-Left movement
+        # 6: Down movement
+        # 7: Down-Right movement
+
+        self.action
+        player = OpenEnv.__rotate_image(self.images['rat'], (self.action - 6)*45)
+        x = self.player.x + 1
+        y = 10 - self.player.y
+        OpenEnv.__overlay_image(frame, player, x*UWIDTH, y*UHEIGHT)
+        x = self.hunter.x + 1
+        y = 10 - self.hunter.y
+        OpenEnv.__overlay_image(frame, self.images['cat'], x*UWIDTH, y*UHEIGHT)
+        x = self.target.x + 1
+        y = 10 - self.target.y
+        OpenEnv.__overlay_image(frame, self.images['cheese'], x*UWIDTH, y*UHEIGHT)
+
+        cv.putText(frame,'Current Score: ' + str(self.reward) , bottomLeftCornerOfText,
+                    font, fontScale, fontColor, thickness, lineType)
+
+        return frame
 
     def step(self, action):
       """Run one timestep of the environment's dynamics. When end of
@@ -129,6 +216,7 @@ class OpenEnv(gym.Env):
 
       # Player movement
 
+      self.action = action
       self.player.action(action)
 
       pos = np.clip([self.player.x, self.player.y], 0, 9)
@@ -181,7 +269,7 @@ class OpenEnv(gym.Env):
         return OrderedDict([('distanceEnemy', self.hunter - self.player),
         ('distanceTarget', self.target - self.player)])
 
-    def render(self, mode='human', close = False):
+    def render(self, mode='human'):
         """Renders the environment.
 
         The set of supported modes varies per environment. (And some
@@ -196,6 +284,7 @@ class OpenEnv(gym.Env):
         - ansi: Return a string (str) or StringIO.StringIO containing a
         terminal-style text representation. The text can include newlines
         and ANSI escape sequences (e.g. for colors).
+        - video: Return a mov file unsing the Apple's version of the MPEG4 part 10/H.264 through the openvc library
 
         Note:
           Make sure that your class's metadata 'render.modes' key includes
@@ -218,19 +307,27 @@ class OpenEnv(gym.Env):
               else:
                   super(MyEnv, self).render(mode=mode) # just raise an exception
         """
+
+        frame = self.__generateframe()
+
         if mode == 'human':
-            if not pg.image.get_extended():
-                raise SystemExit("Sorry, extended image module required")
-            if close:
-                pg.quit()
+
+            cv.imshow("Open Environment - Rat runner", frame)
+            cv.waitKey(50)
+
+            if self.done:
+                cv.destroyAllWindows()
+
+        elif mode == 'video':
+            if self.done:
+                out = cv.VideoWriter('sample.mov',cv.VideoWriter_fourcc(*"avc1"), 20, (WIDTH, HEIGHT), True)
+                for i in range(len(self.frames)):
+                     out.write(self.frames[i][:,:,:3])
+                out.release()
+                cv.destroyAllWindows()
             else:
-                if self.screen is None:
-                    pg.init()
-                    fullscreen = False
-                    # Set the display mode
-                    winstyle = 0  # |FULLSCREEN
-                    bestdepth = pg.display.mode_ok(SCREENRECT.size, winstyle, 32)
-                    self.screen = pg.display.set_mode(SCREENRECT.size, winstyle, bestdepth)
+                self.frames.append(frame)
+
         else:
             super(OpenEnv, self).render(mode=mode)
 

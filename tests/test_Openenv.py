@@ -67,13 +67,18 @@ def test_won():
     env.reset()
 
     for i in range(3):
+        env.render(mode='video')
         obs, score, end, info = env.step(1)
     for i in range(2):
+        env.render(mode='video')
         obs, score, end, info = env.step(0)
     for i in range(2):
+        env.render(mode='video')
         obs, score, end, info = env.step(2)
     for i in range(4):
+        env.render(mode='video')
         obs, score, end, info = env.step(1)
+    env.render(mode='video')
 
     assert((obs['distanceTarget'] == np.array([0,0])).all())
     assert(score == (25-11))
@@ -83,14 +88,15 @@ def test_endbysteps():
     env.reset()
 
     for i in range(200):
+        env.render()
         obs, score, end, info = env.step(0)
-
+    env.render()
     assert(score == -200)
     assert(end)
 
 def main():
 
-    env.render()
+    env.test()
 
 
 
