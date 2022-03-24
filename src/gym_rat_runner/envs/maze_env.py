@@ -127,6 +127,7 @@ class MazeEnv(gym.Env):
         self.observation_space = spaces.Dict({
         "position": spaces.Box(low=np.array([0,0]), high=np.array(self.maze.shape), dtype=np.int32)
         })
+        self.deterministic = True
 
     def step(self, action):
         """Run one timestep of the environment's dynamics. When end of
@@ -161,6 +162,24 @@ class MazeEnv(gym.Env):
           observation (object): the initial observation.
         """
 
+        self.done = False
+        self.reward = 0
+
+        # REVIEW: Save the info?
+
+        self.info = {}
+
+        if not self.deterministic:
+            # NOTE: Proabably will need to be redone
+            self.target = self.AnimatedObject()
+            self.player = self.AnimatedObject()
+            self.hunter = self.AnimatedObject()
+        else:
+            self.target = self.AnimatedObject([11,33])
+            self.player = self.AnimatedObject([11,0])
+            self.hunter = self.AnimatedObject([4,15])
+
+            # COMBAK: 20220324
         pass
 
     def render(self, mode='human', videofile=None):
@@ -212,3 +231,20 @@ class MazeEnv(gym.Env):
 
         else:
             super(MazeEnv, self).render(mode=mode)
+
+    def close(self):
+        """Override close in your subclass to perform any necessary cleanup.
+
+        Environments will automatically close() themselves when
+        garbage collected or when the program exits.
+        """
+        pass
+
+    def setrewards(self, movereward = MOVE_REWARD,
+                    targetreward = TARGET_REWARD, huntereward = HUNTER_REWARD):
+
+        """Change the rewards values in the environment.
+        """
+        self.movereward = movereward
+        self.targetreward = targetreward
+        self.huntereward = huntereward
