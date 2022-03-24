@@ -1,6 +1,8 @@
 import numpy as np
 import gym
 import gym_rat_runner
+from pathlib import Path
+import os
 
 env = gym.make('open-v0')
 pos = env.reset()
@@ -65,24 +67,56 @@ def test_death():
 
 def test_won():
     env.reset()
-
+    home = str(Path.home())
+    videopath=os.path.join(home, 'Videos', 'rat_runner_Openenv')
+    if not Path(videopath).is_dir():
+        os.mkdir(videopath)
+    videopath = os.path.join(videopath, 'testwon.mov')
     for i in range(3):
-        env.render(mode='video')
+        env.render(mode='video', videofile=videopath)
         obs, score, end, info = env.step(1)
     for i in range(2):
-        env.render(mode='video')
+        env.render(mode='video', videofile=videopath)
         obs, score, end, info = env.step(0)
     for i in range(2):
-        env.render(mode='video')
+        env.render(mode='video', videofile=videopath)
         obs, score, end, info = env.step(2)
     for i in range(4):
-        env.render(mode='video')
+        env.render(mode='video', videofile=videopath)
         obs, score, end, info = env.step(1)
-    env.render(mode='video')
+    env.render(mode='video', videofile=videopath)
 
     assert((obs['distanceTarget'] == np.array([0,0])).all())
     assert(score == (25-11))
     assert(end)
+
+def test_newreward_won():
+
+    env.reset()
+    home = str(Path.home())
+    videopath=os.path.join(home, 'Videos', 'rat_runner_Openenv')
+    if not Path(videopath).is_dir():
+        os.mkdir(videopath)
+    videopath = os.path.join(videopath, 'newtestwon.mov')
+    env.setrewards(targetreward=1000)
+    for i in range(3):
+        env.render(mode='video', videofile=videopath)
+        obs, score, end, info = env.step(1)
+    for i in range(2):
+        env.render(mode='video', videofile=videopath)
+        obs, score, end, info = env.step(0)
+    for i in range(2):
+        env.render(mode='video', videofile=videopath)
+        obs, score, end, info = env.step(2)
+    for i in range(4):
+        env.render(mode='video', videofile=videopath)
+        obs, score, end, info = env.step(1)
+    env.render(mode='video', videofile=videopath)
+
+    assert((obs['distanceTarget'] == np.array([0,0])).all())
+    assert(score == (1000-11))
+    assert(end)
+
 
 def test_endbysteps():
     env.reset()
@@ -95,8 +129,10 @@ def test_endbysteps():
     assert(end)
 
 def main():
+    home = str(Path.home())
+    os.path.join(home, 'Videos', 'rat_runner_openenv')
+    print(os.path.join(home, 'Videos', 'rat_runner_Openenv', 'testwon.mov'))
 
-    env.test()
 
 
 
