@@ -1,12 +1,10 @@
 import gym
 from gym import error, spaces, utils
-from gym.utils import seeding
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
 import os
 import glob
-import time
 
 import cv2 as cv
 
@@ -19,7 +17,6 @@ TARGET_REWARD = 25
 
 HEIGHT, WIDTH = 720, 720
 UHEIGHT, UWIDTH = HEIGHT//(SPACES+2), WIDTH//(SPACES+2)
-SCORE = 0
 DARK_GREEN = (21, 89, 33)
 MAZE_FILE = "Open_Maze.csv"
 
@@ -35,9 +32,7 @@ lineType                = 2
 main_dir = os.path.abspath(os.path.join(os.path.split(os.path.abspath(__file__))[0], os.pardir))
 
 class OpenEnv(gym.Env):
-    metadata = {'render.modes': ['human', 'video']}
-    renderinit = False
-    screen = None
+    metadata = {'render.modes': ['human', 'video', 'rgb_array']}
 
     class AnimatedObject():
         """Internal object to generate the interactive objects"""
@@ -84,9 +79,6 @@ class OpenEnv(gym.Env):
 
     def __init__(self, width=SPACES, height=SPACES):
 
-        self.width = width
-        self.height = height
-
         # Load Maze
         maze_file = os.path.join(main_dir, 'envs', 'maze', MAZE_FILE)
         self.maze = pd.read_csv(maze_file, header = None)
@@ -102,15 +94,27 @@ class OpenEnv(gym.Env):
 
         self.frames = []
 
-        self.target =  None
+        # Animated Objects for the environment
+        self.target = None
         self.player = None
         self.hunter = None
+
+        # Set rewards for the game
+
+        self.movereward = MOVE_REWARD
+        self.huntereward = HUNTER_REWARD
+        self.targetreward = TARGET_REWARD
 
         self.action = None
         self.reward = 0
         self.done = False
         self.info = {}
         self.action_space = spaces.Discrete(8)
+
+        # The player is only able to observer:
+        #  - The distance between him and the hunter
+        #  - The dstance between him and the target
+
         self.observation_space = spaces.Dict({
         'distanceTarget': spaces.Box(low=-SPACES + 1, high=SPACES - 1, shape=(2,), dtype=np.int32),
         'distanceEnemy':spaces.Box(low=-SPACES + 1, high=SPACES - 1, shape=(2,), dtype=np.int32)})
@@ -170,7 +174,7 @@ class OpenEnv(gym.Env):
         # 6: Down movement
         # 7: Down-Right movement
 
-        self.action
+
         player = OpenEnv.__rotate_image(self.images['rat'], (self.action - 6)*45)
         x = self.player.x + 1
         y = 10 - self.player.y
@@ -225,13 +229,13 @@ class OpenEnv(gym.Env):
       obs = OrderedDict([('distanceEnemy', self.hunter - self.player),
       ('distanceTarget', self.target - self.player)])
 
-      self.reward += MOVE_REWARD
+      self.reward += self.movereward
 
       if (obs['distanceEnemy'] == np.array([0, 0])).all():
-          self.reward += HUNTER_REWARD
+          self.reward += self.huntereward
           self.done = True
       if (obs['distanceTarget'] == np.array([0, 0])).all():
-          self.reward += TARGET_REWARD
+          self.reward += self.targetreward
           self.done = True
 
       return obs, self.reward, self.done, self.info
@@ -269,7 +273,7 @@ class OpenEnv(gym.Env):
         return OrderedDict([('distanceEnemy', self.hunter - self.player),
         ('distanceTarget', self.target - self.player)])
 
-    def render(self, mode='human'):
+    def render(self, mode='human', videofile=None):
         """Renders the environment.
 
         The set of supported modes varies per environment. (And some
@@ -313,20 +317,28 @@ class OpenEnv(gym.Env):
         if mode == 'human':
 
             cv.imshow("Open Environment - Rat runner", frame)
-            cv.waitKey(50)
+            cv.waitKey(25)
 
             if self.done:
                 cv.destroyAllWindows()
+
+        elif mode == 'rgb_array':
+
+            self.frames.append(frame[:,:,:3])
+            if self.done:
+                return self.frames
+
 
         elif mode == 'video':
+            self.frames.append(frame[:,:,:3])
             if self.done:
-                out = cv.VideoWriter('sample.mov',cv.VideoWriter_fourcc(*"avc1"), 20, (WIDTH, HEIGHT), True)
+                out = cv.VideoWriter(videofile,cv.VideoWriter_fourcc(*"avc1"), 20, (WIDTH, HEIGHT), True)
                 for i in range(len(self.frames)):
-                     out.write(self.frames[i][:,:,:3])
+                     out.write(self.frames[i])
                 out.release()
                 cv.destroyAllWindows()
-            else:
-                self.frames.append(frame)
+                self.frames = []
+
 
         else:
             super(OpenEnv, self).render(mode=mode)
@@ -339,8 +351,18 @@ class OpenEnv(gym.Env):
       """
       pass
 
-    def stochastic(self, stoc = False):
+    def setstochastic(self, stoc = True):
         self.deterministic = stoc
+
+    def setrewards(self, movereward = MOVE_REWARD,
+                    targetreward = TARGET_REWARD, huntereward = HUNTER_REWARD):
+        """ Change the rewards values in the environment.
+
+
+        """
+        self.movereward = movereward
+        self.targetreward = targetreward
+        self.huntereward = huntereward
 
     def test(self):
         print(main_dir)
