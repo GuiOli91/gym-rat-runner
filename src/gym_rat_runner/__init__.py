@@ -6,7 +6,10 @@ register(
     max_episode_steps=200,
     nondeterministic = True,
 )
-# register(
-#     id='maze-v0',
-#     entry_point='gym_rat_runner.envs:MazeEnv',
-# )
+
+register(
+    id='maze-v0',
+    entry_point='gym_rat_runner.envs:MazeEnv',
+    max_episode_steps = 200,
+    nondeterministic = True,    
+)
