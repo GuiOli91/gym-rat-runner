@@ -16,15 +16,16 @@ TARGET_REWARD = 25
 
 #Screen constants
 
-UNIT = 60                           # Units for the renderization
-DARK_GREEN = (21, 89, 33)           # Background color
+UNIT = 50                           # Units for the renderization
+GREEN = (21, 89, 33, 255)           # Background color
+DARK_GREEN = (47, 68, 52, 255)
 MAZE_FILE = "Maze1.csv"             # Maze file for the renderization
 
 #Text parameters
 
 font                    = cv.FONT_HERSHEY_SIMPLEX
-bottomLeftCornerOfText  = None # Will be updated based on maze's size.
-fontScale               = 0.5
+bottomLeftCornerOfText  = (10, 18*UNIT - UNIT//3) # Will be updated based on maze's size.
+fontScale               = 1
 fontColor               = (255,255,255)
 thickness               = 2
 lineType                = 2
@@ -33,6 +34,8 @@ main_dir = os.path.abspath(os.path.join(os.path.split(os.path.abspath(__file__))
 
 class MazeEnv(gym.Env):
     """docstring for MazeEnv."""
+
+    metadata = {'render.modes': ['human', 'video', 'rgb_array']}
 
     class AnimatedObject():
         """
@@ -81,7 +84,7 @@ class MazeEnv(gym.Env):
             self.x = x
             self.y = y
 
-    metadata = {'render.modes': ['human', 'video', 'rgb_array']}
+
 
     def __init__(self):
         super(MazeEnv, self).__init__()
@@ -91,7 +94,7 @@ class MazeEnv(gym.Env):
         self.maze = pd.read_csv(maze_file, header = None)
 
         # Updates based on the Maze
-        bottomLeftCornerOfText = (10, self.maze.shape[0]*UNIT - UNIT//2)
+        bottomLeftCornerOfText = (10, self.maze.shape[1]*UNIT - UNIT//2)
 
         #Load Images
         pathimages = os.path.join(main_dir, 'images', '*.png')
@@ -115,7 +118,11 @@ class MazeEnv(gym.Env):
         self.huntereward = HUNTER_REWARD
         self.targetreward = TARGET_REWARD
 
-        self.action = None
+        # range of Vision
+        self.playervision = 40
+        self.huntervision = 10
+
+        self.action = 0  # The player enters in the maze in the Right direction.
         self.reward = 0
         self.done = False
         self.info = {}
@@ -123,11 +130,95 @@ class MazeEnv(gym.Env):
 
         # The player is able to observer:
         #  - The cartesian position of himself.
-        #  - The maze within the observable distance. TO BE ADDED
+        #  - The Hunter's position.
+        #  - The Target's position.
+
         self.observation_space = spaces.Dict({
-        "position": spaces.Box(low=np.array([0,0]), high=np.array(self.maze.shape), dtype=np.int32)
+        "position": spaces.Box(low=np.array([0,0]), high=np.array(self.maze.shape), dtype=np.int32),
+        "hunter": [],
+        "target": spaces.Box(low=np.array([0,0]), high=np.array(self.maze.shape), dtype=np.int32)
         })
         self.deterministic = True
+
+    def __overlay_image(img, img_overlay, x, y):
+        """Overlay `img_overlay` onto `img` at (x, y) and blend using the alpha on boths images.
+
+        """
+        # Image ranges
+        y1, y2 = max(0, y), min(img.shape[0], y + img_overlay.shape[0])
+        x1, x2 = max(0, x), min(img.shape[1], x + img_overlay.shape[1])
+
+        # Overlay ranges
+        y1o, y2o = max(0, -y), min(img_overlay.shape[0], img.shape[0] - y)
+        x1o, x2o = max(0, -x), min(img_overlay.shape[1], img.shape[1] - x)
+
+        # Exit if nothing to do
+        if y1 >= y2 or x1 >= x2 or y1o >= y2o or x1o >= x2o:
+            return
+
+        # Blend overlay within the determined ranges
+        img_crop = img[y1:y2, x1:x2]
+        img_overlay_crop = img_overlay[y1o:y2o, x1o:x2o]
+
+        alphaoverlay = img_overlay[y1o:y2o, x1o:x2o, 3]/255.0
+        alphaunderlay = 1 - alphaoverlay
+
+        for color in range(3):
+            img_crop[:,:,color] = (alphaoverlay*img_overlay_crop[:,:,color] +
+                                    alphaunderlay*img_crop[:,:,color])
+
+    def __rotate_image(image, angle):
+        image_center = tuple(np.array(image.shape[1::-1]) / 2)
+        rot_mat = cv.getRotationMatrix2D(image_center, angle, 1.0)
+        result = cv.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv.INTER_LINEAR)
+        return result
+
+    def __generateframe(self):
+
+        height, width = self.maze.shape
+
+        frame = np.zeros((height*UNIT, width*UNIT,4), np.uint8)
+        frame[:] = DARK_GREEN
+        greenblock = np.zeros((UNIT, UNIT,4), np.uint8)
+        greenblock[:] = GREEN
+
+        for i in range(self.maze.shape[0]):
+            for j in range(self.maze.shape[1]):
+                x = self.player.x - j
+                y = self.player.y - height + i
+                if self.maze.iloc[i,j] == 1:
+                    MazeEnv.__overlay_image(frame, self.images['wall'], j*UNIT, i*UNIT)
+                elif np.sqrt((x**2)+(y**2)) <= self.playervision:
+                    MazeEnv.__overlay_image(frame, greenblock, j*UNIT, i*UNIT)
+
+
+        # Expected Actions:
+        # 0: Right movement
+        # 1: Up-Right movement
+        # 2: Up movement
+        # 3: Up-Left movement
+        # 4: Left movement
+        # 5: Down-Left movement
+        # 6: Down movement
+        # 7: Down-Right movement
+
+        player = MazeEnv.__rotate_image(self.images['rat'], (self.action - 6)*45)
+        x = self.player.x
+        y =  height - self.player.y
+        MazeEnv.__overlay_image(frame, player, x*UNIT, y*UNIT)
+        x = self.player.x - self.hunter.x
+        y = self.player.y - self.hunter.y
+        if np.sqrt((x**2)+(y**2)) <= self.playervision:
+            x = self.hunter.x
+            y = height - self.hunter.y
+            MazeEnv.__overlay_image(frame, self.images['cat'], x*UNIT, y*UNIT)
+        x = self.target.x
+        y = height - self.target.y
+        MazeEnv.__overlay_image(frame, self.images['cheese'], x*UNIT, y*UNIT)
+
+        cv.putText(frame,'Current Score: ' + str(self.reward),  bottomLeftCornerOfText, font, fontScale, fontColor, thickness, lineType)
+
+        return frame
 
     def step(self, action):
         """Run one timestep of the environment's dynamics. When end of
@@ -148,7 +239,7 @@ class MazeEnv(gym.Env):
 
         pass
 
-    def reset(self, arg):
+    def reset(self):
         """Resets the environment to an initial state and returns an initial
         observation.
 
@@ -175,12 +266,15 @@ class MazeEnv(gym.Env):
             self.player = self.AnimatedObject()
             self.hunter = self.AnimatedObject()
         else:
-            self.target = self.AnimatedObject([11,33])
-            self.player = self.AnimatedObject([11,0])
-            self.hunter = self.AnimatedObject([4,15])
+            self.target = self.AnimatedObject([33,13])
+            self.player = self.AnimatedObject([0,13])
+            self.hunter = self.AnimatedObject([16,16])
 
-            # COMBAK: 20220324
-        pass
+        return self.getObservation()
+        # return OrderedDict([
+        # ('position', np.array([self.player.x, self.player.y], dtype='int32')),
+        # ('hunter', np.array([self.hunter.x, self.hunter.y], dtype='int32')),
+        # ('target', np.array([self.target.x, self.target.y], dtype='int32'))])
 
     def render(self, mode='human', videofile=None):
         """Renders the environment.
@@ -220,8 +314,16 @@ class MazeEnv(gym.Env):
               else:
                   super(MyEnv, self).render(mode=mode) # just raise an exception
         """
+
+        frame = self.__generateframe()
+
         if mode == 'human':
-            pass
+
+            cv.imshow("Maze Environment - Rat runner", frame)
+            cv.waitKey(1000)
+
+            if self.done:
+                cv.destroyAllWindows()
 
         elif mode == 'rgb_array':
             pass
@@ -240,11 +342,36 @@ class MazeEnv(gym.Env):
         """
         pass
 
-    def setrewards(self, movereward = MOVE_REWARD,
-                    targetreward = TARGET_REWARD, huntereward = HUNTER_REWARD):
+    def setrewards(self, movereward = MOVE_REWARD, targetreward = TARGET_REWARD, huntereward = HUNTER_REWARD):
 
         """Change the rewards values in the environment.
         """
         self.movereward = movereward
         self.targetreward = targetreward
         self.huntereward = huntereward
+
+    def setfieldvision(self, range):
+        self.playervision = range
+
+    def getObservation(self):
+
+        position = ('position',
+                    np.array([self.player.x, self.player.y],
+                    dtype='int32'))
+        x = self.player.x - self.hunter.x
+        y = self.player.y - self.hunter.y
+
+        if np.sqrt((x**2)+(y**2)) <= self.playervision:
+            x = self.hunter.x
+            y = self.hunter.y
+        else:
+            x = np.nan
+            y = np.nan
+
+        hunter = ('hunter', np.array([x, y], dtype='int32'))
+
+        target = ('target',
+                    np.array([self.target.x, self.target.y],
+                    dtype='int32'))
+
+        return OrderedDict([position, hunter, target])
