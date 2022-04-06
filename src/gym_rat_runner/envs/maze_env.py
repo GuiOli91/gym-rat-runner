@@ -1,6 +1,7 @@
 import gym
 from gym import error, spaces, utils
 from collections import OrderedDict
+from typing import Optional
 import pandas as pd
 import numpy as np
 import  os
@@ -25,7 +26,7 @@ MAZE_FILE = "Maze1.csv"             # Maze file for the renderization
 #Text parameters
 
 font                    = cv.FONT_HERSHEY_SIMPLEX
-bottomLeftCornerOfText  = (10, 18*UNIT - UNIT//3) # Will be updated based on maze's size.
+bottomLeftCornerOfText  = (10, 18*UNIT - UNIT//3)
 fontScale               = 1
 fontColor               = (255,255,255)
 thickness               = 2
@@ -44,13 +45,8 @@ class MazeEnv(gym.Env):
         """
 
         def __init__(self, pos = None):
-            if not pos:
-                # NOTE: This part need to be updated based on the maze
-                self.x = np.random.randint(0,10)
-                self.y = np.random.randint(0,10)
-            else:
-                self.x = pos[0]
-                self.y = pos[1]
+            self.x = pos[0]
+            self.y = pos[1]
 
             self.pos = (self.x, self.y)
 
@@ -89,14 +85,18 @@ class MazeEnv(gym.Env):
             self.y = y
             self.pos = (self.x, self.y)
 
-
-
     def __init__(self):
         super(MazeEnv, self).__init__()
 
         #Load Maze
         maze_file = os.path.join(main_dir, 'envs', 'maze', MAZE_FILE)
         self.maze = pd.read_csv(maze_file, header = None)
+
+        self.availablepos = []
+        for i in range(self.maze.shape[0]):
+            for j in range(self.maze.shape[1]):
+                if self.maze.iloc[i,j] != 1:
+                    self.availablepos.append([i,j])
 
         # Updates based on the Maze
         bottomLeftCornerOfText = (10, self.maze.shape[1]*UNIT - UNIT//2)
@@ -126,7 +126,7 @@ class MazeEnv(gym.Env):
 
         # range of Vision
         self.playervision = 40
-        self.huntervision = 10
+        self.huntervision = 8
 
         self.action = 0  # The player enters in the maze in the Right direction.
         self.reward = 0
@@ -134,19 +134,21 @@ class MazeEnv(gym.Env):
         self.info = {}
         self.action_space = spaces.Discrete(8)
 
+        self.stoc_rate = 0.2
+
         # The player is able to observer:
         #  - The cartesian position of himself.
         #  - The Hunter's position.
         #  - The Target's position.
         # NOTE: The value -1 for the hunter means that the player is unable to
-        # see the Hunter.s
+        # see the Hunter.
 
         self.observation_space = spaces.Dict({
         "position": spaces.Box(low=np.array([0,0]), high=np.array(self.maze.shape), dtype=np.int32),
         "hunter": spaces.Box(low=np.array([-1,-1]), high=np.array(self.maze.shape), dtype=np.int32),
         "target": spaces.Box(low=np.array([0,0]), high=np.array(self.maze.shape), dtype=np.int32)
         })
-        self.deterministic = True
+        self.randompos = False
 
     def __overlay_image(img, img_overlay, x, y):
         """Overlay `img_overlay` onto `img` at (x, y) and blend using the alpha on boths images.
@@ -268,73 +270,61 @@ class MazeEnv(gym.Env):
         }
 
         # Hunter movement
-        min_choices = self.hunter_direction - 2
-        max_choices = self.hunter_direction + 3
 
-        if  min_choices < 0:
-            min_choices = 0
-        if  max_choices > 8:
-            max_choices = 8
-
-        hunter_choices = list(range(min_choices, max_choices))
-
-        if len(hunter_choices) < 6:
-            if max_choices == 8:
-                otherchoices = list(range(0,6-len(hunter_choices)))
-            else:
-                otherchoices = list(range(3+len(hunter_choices), 8))
-            hunter_choices = hunter_choices +  otherchoices
 
         prow, pcol = self.player.pos
         hrow, hcol = self.hunter.pos
 
-        # Remove wall colisions
-        for choice in hunter_choices:
-            row, col = actions.get(choice)
-            if self.maze.iloc[hrow+row, hcol+col] == 1:
-                hunter_choices.remove(choice)
-
         x = prow - hrow
         y = pcol - hcol
 
-        if np.sqrt((x**2)+(y**2)) <= self.huntervision:
-            print("Inside fieldVision")
+        if np.sqrt((x**2)+(y**2)) > self.huntervision:
+            self.movehunter()
+
         else:
-            choice = random.choice(hunter_choices)
-            self.hunter.action(choice)
-            self.hunter.hunter_direction = choice
+            self.movehunter()
+            if self.player.pos != self.hunter.pos:
+                self.movehunter()
 
         # Player movement
-
-        self.action = action
-
-        # NOTE: Add Hunter movement before Player movement
-
-        self.player.action(action)
-
-        # Check Player colisions with walls and correct position if necessary.
-
-        if self.maze.iloc[self.player.pos] == 1:
-
-            if 'wall_colisions' in self.info.keys():
-                self.info['wall_colisions'] += 1
+        if self.player.pos != self.hunter.pos:
+            if self.spec.nondeterministic and random.uniform(0, 1) <= self.stoc_rate:
+                self.action = random.choice(range(0,8))
             else:
-                self.info['wall_colisions'] = 1
+                self.action = action
 
-            row, col = actions.get(action)
+            # NOTE: Add Hunter movement before Player movement
+
+            self.player.action(self.action)
+
+            row, col = actions.get(self.action)
             crow, ccol = self.player.pos
 
-            if row != 0 and col != 0:
-                if self.maze.iloc[crow-row, ccol] != 1:
-                    self.player.newpos(crow-row, ccol)
-                elif self.maze.iloc[crow, ccol-col] != 1:
-                    self.player.newpos(crow, ccol-col)
+            # Check Player colisions with walls and correct position if necessary.
+
+            if self.maze.iloc[self.player.pos] == 1:
+
+                if 'wall_colisions' in self.info.keys():
+                    self.info['wall_colisions'] += 1
+                else:
+                    self.info['wall_colisions'] = 1
+
+                if row != 0 and col != 0:
+                    if self.maze.iloc[crow-row, ccol] != 1:
+                        self.player.newpos(crow-row, ccol)
+                    elif self.maze.iloc[crow, ccol-col] != 1:
+                        self.player.newpos(crow, ccol-col)
+                    else:
+                        self.player.newpos(crow-row, ccol-col)
                 else:
                     self.player.newpos(crow-row, ccol-col)
-            else:
-                self.player.newpos(crow-row, ccol-col)
 
-        self.reward += self.movereward
+            if ccol < 0:
+                self.player.newpos(crow, 33)
+            elif ccol > 32:
+                self.player.newpos(crow, 0)
+
+            self.reward += self.movereward
 
         # Colision with the Hunter
         if self.player.pos == self.hunter.pos:
@@ -350,8 +340,7 @@ class MazeEnv(gym.Env):
 
         return self.getObservation(), self.reward, self.done, self.info
 
-
-    def reset(self):
+    def reset(self, seed: Optional[int] = None):
         """Resets the environment to an initial state and returns an initial
         observation.
 
@@ -368,14 +357,17 @@ class MazeEnv(gym.Env):
         self.done = False
         self.reward = 0
 
+        random.seed(seed)
+
 
         self.info = {}
 
-        if not self.deterministic:
+        if self.randompos:
             # NOTE: Proabably will need to be redone
-            self.target = self.AnimatedObject()
-            self.player = self.AnimatedObject()
-            self.hunter = self.AnimatedObject()
+            random.shuffle(self.availablepos)
+            self.target = self.AnimatedObject(self.availablepos[0])
+            self.player = self.AnimatedObject(self.availablepos[1])
+            self.hunter = self.AnimatedObject(self.availablepos[2])
         else:
             self.target = self.AnimatedObject([5,32])
             self.player = self.AnimatedObject([5,1])
@@ -497,3 +489,86 @@ class MazeEnv(gym.Env):
                     dtype='int32'))
 
         return OrderedDict([position, hunter, target])
+
+    def movehunter(self):
+
+        actions = {
+        0: (0,1),
+        1: (-1,1),
+        2: (-1,0),
+        3: (-1,-1),
+        4: (0,-1),
+        5: (1,-1),
+        6: (1,0),
+        7: (1,1)
+        }
+
+        min_choices = self.hunter_direction - 2
+        max_choices = self.hunter_direction + 3
+
+        if  min_choices < 0:
+            min_choices = 0
+        if  max_choices > 8:
+            max_choices = 8
+
+        hunter_choices = list(range(min_choices, max_choices))
+
+        if len(hunter_choices) < 6:
+            if max_choices == 8:
+                otherchoices = list(range(0,5-len(hunter_choices)))
+            else:
+                otherchoices = list(range(3+len(hunter_choices), 8))
+            hunter_choices = hunter_choices +  otherchoices
+
+        prow, pcol = self.player.pos
+        hrow, hcol = self.hunter.pos
+
+        # Remove wall colisions
+        new_hunter_choices = hunter_choices.copy()
+        for choice in hunter_choices:
+            row, col = actions.get(choice)
+            x = hrow+row
+            y = hcol+col
+            if self.maze.iloc[x, y] == 1.0:
+                new_hunter_choices.remove(choice)
+            elif y <= 0 or y >= 33:
+                new_hunter_choices.remove(choice)
+
+            hunter_choices = new_hunter_choices
+
+        x = prow - hrow
+        y = pcol - hcol
+
+        if len(hunter_choices) == 0:
+            if self.hunter_direction <= 3:
+                new_direction = self.hunter_direction + 4
+            else:
+                new_direction = self.hunter_direction - 4
+
+            self.hunter_direction = new_direction
+
+        elif np.sqrt((x**2)+(y**2)) > self.huntervision:
+            choice = random.choice(hunter_choices)
+            self.hunter.action(choice)
+            self.hunter_direction = choice
+        else:
+            check = pd.Series(dtype = 'float')
+            for choice in hunter_choices:
+                row, col = actions.get(choice)
+                x = hrow+row - prow
+                y = hcol+col - pcol
+
+                check = pd.concat([check,
+                                   pd.Series(index = [choice],
+                                             data = [np.sqrt((x**2)+(y**2))],
+                                             dtype = 'float')
+                                  ])
+            check.sort_values(ascending=True, inplace = True)
+            self.hunter.action(check.index[0])
+            self.hunter_direction = check.index[0]
+
+    def randomposition(self, randompos = True):
+        self.randompos = randompos
+
+    def setstoc_rate(self, rate = 0.2):
+        self.stoc_rate = rate

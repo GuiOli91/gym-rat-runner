@@ -3,20 +3,28 @@ import gym
 import gym_rat_runner
 from pathlib import Path
 import os
+from gym.envs.registration import register
 
 env = gym.make('maze-v0')
 
 
 def test_InitialObservation():
-    env.setframepersec(2)
+    env.setframepersec(40)
     obs = env.reset()
     env.render()
     assert ((obs['position'] == np.array([5,1], dtype='int32')).all())
     assert ((obs['hunter'] == np.array([2,16], dtype='int32')).all())
     assert ((obs['target'] == np.array([5,32], dtype='int32')).all())
 
+def test_StocObservation():
+    env.randomposition()
+    for i in range(10):
+        obs = env.reset()
+        env.render()
+    env.randomposition(randompos = False)
+
 def test_changefieldvision():
-    env.setfieldvision(range = 8)
+    env.setfieldvision(range = 10)
     obs = env.reset()
     env.render()
     assert ((obs['position'] == np.array([5,1], dtype='int32')).all())
@@ -26,7 +34,7 @@ def test_changefieldvision():
 
 def test_move_Right():
     obs = env.reset()
-    env.setframepersec(20)
+    env.setframepersec(40)
     env.render()
     obs, reward, done, info = env.step(0)
     env.render()
@@ -103,79 +111,69 @@ def test_move_Down_Right():
     assert(info['wall_colisions'] == 1)
 
 def test_death():
-    obs = env.reset()
+    obs = env.reset(seed= 123)
     env.render()
-    # 9 moves to Right
-    for i in range(9):
+
+    while True:
         obs, reward, done, info = env.step(0)
         env.render()
-    # 3 moves to Up
-    for i in range(2):
-        obs, reward, done, info = env.step(2)
-        env.render()
-    for i in range(6):
-        obs, reward, done, info = env.step(0)
-        env.render()
-    obs, reward, done, info = env.step(2)
-    env.render()
+        if done:
+            break
     assert((obs['position'] == obs['hunter']).all())
-    assert(reward == -318)
-    assert(done == False)
+    assert(reward < -300)
+    assert(done == True)
 
 def test_win():
-    obs = env.reset()
+    obs = env.reset(seed=123)
     env.render()
     # 9 moves to Right
-    for i in range(9):
-        obs, reward, done, info = env.step(0)
+    moves = [0]*2 + [6]*2 + [4]*2 + [6]*2 + [4]*4 + [2]*2 + [4]*1 + [2]*2 + [0]*2
+    for move in moves:
+        obs, reward, done, info = env.step(move)
         env.render()
-    # 3 moves to Up
-    for i in range(2):
-        obs, reward, done, info = env.step(2)
-        env.render()
-    for i in range(14):
-        obs, reward, done, info = env.step(0)
-        env.render()
-    for i in range(2):
-        obs, reward, done, info = env.step(6)
-        env.render()
-    for i in range(9):
-        obs, reward, done, info = env.step(0)
-        env.render()
-    env.render()
+        if done:
+            break
+
     assert((obs['position'] == obs['target']).all())
-    assert(reward == 14)
+    assert(reward == 6)
     assert(done == True)
 
 def test_win_dark():
     env.setfieldvision(range = 5)
-    obs = env.reset()
+    obs = env.reset(seed=123)
     env.render()
     # 9 moves to Right
-    for i in range(9):
-        obs, reward, done, info = env.step(0)
+    moves = [0]*2 + [6]*2 + [4]*2 + [6]*2 + [4]*4 + [2]*2 + [4]*1 + [2]*2 + [0]*2
+    for move in moves:
+        obs, reward, done, info = env.step(move)
         env.render()
-    # 3 moves to Up
-    for i in range(2):
-        obs, reward, done, info = env.step(2)
-        env.render()
-    for i in range(14):
-        obs, reward, done, info = env.step(0)
-        env.render()
-    for i in range(2):
-        obs, reward, done, info = env.step(6)
-        env.render()
-    for i in range(9):
-        obs, reward, done, info = env.step(0)
-        env.render()
-    env.render()
+        if done:
+            break
+
+
     assert((obs['position'] == obs['target']).all())
-    assert(reward == 14)
+    assert(reward == 6)
     assert(done == True)
+
+def test_changedeterministic():
+    global env
+    assert(env.spec.nondeterministic == False)
+    env = gym.make('maze-stoc-v0')
+    assert(env.spec.nondeterministic == True)
+
+    obs = env.reset(seed=123)
+    env.render()
+
+    while True:
+        obs, reward, done, info = env.step(0)
+        env.render()
+        if done:
+            break
 
 
 def main():
-    pass
+
+    return
 
 
 if __name__ == '__main__':
