@@ -1,12 +1,12 @@
 # Gym-Rat-Runner
----
+
 ## Introduction
----
+
 
 <!-- The Project's aim -->
 
 ## Installation
----
+
 ### Requirements
 
 
@@ -20,7 +20,7 @@
 
 
 ## Environments
----
+
 
 ### Open Environment
 <!-- Open Environment -->
