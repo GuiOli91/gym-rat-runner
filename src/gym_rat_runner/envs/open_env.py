@@ -105,7 +105,7 @@ class OpenEnv(gym.Env):
         self.huntereward = HUNTER_REWARD
         self.targetreward = TARGET_REWARD
 
-        self.action = None
+        self.action = 1
         self.reward = 0
         self.done = False
         self.info = {}
@@ -173,7 +173,6 @@ class OpenEnv(gym.Env):
         # 5: Down-Left movement
         # 6: Down movement
         # 7: Down-Right movement
-
 
         player = OpenEnv.__rotate_image(self.images['rat'], (self.action - 6)*45)
         x = self.player.x + 1
@@ -326,7 +325,10 @@ class OpenEnv(gym.Env):
 
             self.frames.append(frame[:,:,:3])
             if self.done:
-                return self.frames
+                frames = self.frames
+                self.frames = []
+                return frames
+            return self.frames
 
 
         elif mode == 'video':

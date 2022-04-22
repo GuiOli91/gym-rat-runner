@@ -173,7 +173,15 @@ def test_changedeterministic():
 
 def main():
 
-    return
+    from matplotlib import pyplot as plt
+    import cv2 as cv
+
+    env = gym.make('maze-v0')
+    obs = env.reset()
+    frame = env.render(mode='rgb_array')
+    frame_rgb = cv.cvtColor(frame[0], cv.COLOR_BGR2RGB)
+    plt.imsave("test.png", arr = frame_rgb)
+
 
 
 if __name__ == '__main__':

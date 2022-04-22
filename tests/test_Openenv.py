@@ -129,9 +129,15 @@ def test_endbysteps():
     assert(end)
 
 def main():
-    home = str(Path.home())
-    os.path.join(home, 'Videos', 'rat_runner_openenv')
-    print(os.path.join(home, 'Videos', 'rat_runner_Openenv', 'testwon.mov'))
+
+    from matplotlib import pyplot as plt
+    import cv2 as cv
+
+    env = gym.make('open-v0')
+    obs = env.reset()
+    frame = env.render(mode='rgb_array')
+    frame_rgb = cv.cvtColor(frame[0], cv.COLOR_BGR2RGB)
+    plt.imsave("Open_Environment.png", arr = frame_rgb)
 
 
 

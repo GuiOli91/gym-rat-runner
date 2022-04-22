@@ -431,6 +431,7 @@ class MazeEnv(gym.Env):
                 frames = self.frames
                 self.frames = []
                 return frames
+            return self.frames
 
         elif mode == 'video':
             self.frames.append(frame[:,:,:3])
