@@ -4,16 +4,16 @@
 
 **Gym Rat Runner** is an open-source environment implemented over [OpenAI Gym](https://gym.openai.com/).It is a 2-D discrete environment intended for Reinforcement learning applications with collision treatments. For now, the package has two distinct environments; the open and the maze environments.
 
-### Agent <img src="/images/rat.png" alt="Rat Agent" width="40" height="40" style="display:inline;">
+### Agent <img src="https://raw.githubusercontent.com/GuiOli91/gym-rat-runner/main/images/rat.png" alt="Rat Agent" width="40" height="40" style="display:inline;">
 
 The agent is represented by a friendly rat with the objective of catching the cheese. Which will have eight move action options.
 
 
-### Target <img src="/images/cheese.png" alt="Target" width="40" height="40" style="display:inline;">
+### Target <img src="https://raw.githubusercontent.com/GuiOli91/gym-rat-runner/main/images/cheese.png" alt="Target" width="40" height="40" style="display:inline;">
 
 The cheese won't move and will always be visible to the Agent.
 
-### Hunter <img src="/images/cat.png" alt="Hunter" width="40" height="40" style="display:inline;">
+### Hunter <img src="https://raw.githubusercontent.com/GuiOli91/gym-rat-runner/main/images/cat.png" alt="Hunter" width="40" height="40" style="display:inline;">
 
 The Hunter is represented by a cat and will move differently depending on the environment.
 
@@ -43,7 +43,7 @@ pip install gym-rat-runner
 
 <br/>
 
-<img src="/images/Open_Environment.png" alt="Open Environment" width="360" height="360" style="display:block; margin-left: auto; margin-right: auto;">
+<img src="https://raw.githubusercontent.com/GuiOli91/gym-rat-runner/main/images/Open_Environment.png" alt="Open Environment" width="360" height="360" style="display:block; margin-left: auto; margin-right: auto;">
 <br/>
 
 
@@ -52,7 +52,7 @@ The open environment has 10 by 10 spaces and the cat is sleeping and won't move 
 ### Maze Environment
 
 <br/>
-<img src="/images/Maze_Environment.png" alt="Maze Environment" width="850" height="450" style="display:block; margin-left: auto; margin-right: auto;">
+<img src="https://raw.githubusercontent.com/GuiOli91/gym-rat-runner/main/images/Maze_Environment.png" alt="Maze Environment" width="850" height="450" style="display:block; margin-left: auto; margin-right: auto;">
 <br/>
 
 The maze environment has 16 by 32 spaces based on the [Bank Heist](http://www.virtualatari.org/soft.php?soft=Bank_Heist) from Atari. Like the police in Bank Heist, the hunter won't be able to move back but it will have two options of movement:
