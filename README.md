@@ -42,7 +42,6 @@ pip install gym-rat-runner
 ### Open Environment
 
 <br/>
-<br/>
 
 <img src="/images/Open_Environment.png" alt="Open Environment" width="360" height="360" style="display:block; margin-left: auto; margin-right: auto;">
 <br/>
@@ -52,7 +51,6 @@ The open environment has 10 by 10 spaces and the cat is sleeping and won't move 
 
 ### Maze Environment
 
-<br/>
 <br/>
 <img src="/images/Maze_Environment.png" alt="Maze Environment" width="850" height="450" style="display:block; margin-left: auto; margin-right: auto;">
 <br/>
