@@ -9,11 +9,11 @@
 The agent is represented by a friendly rat with the objective of catching the cheese. Which will have eight move action options.
 
 
-### Target <img src="/images/cheese.png" alt="Rat Agent" width="40" height="40" style="display:inline;">
+### Target <img src="/images/cheese.png" alt="Target" width="40" height="40" style="display:inline;">
 
 The cheese won't move and will always be visible to the Agent.
 
-### Hunter <img src="/images/cat.png" alt="Rat Agent" width="40" height="40" style="display:inline;">
+### Hunter <img src="/images/cat.png" alt="Hunter" width="40" height="40" style="display:inline;">
 
 The Hunter is represented by a cat and will move differently depending on the environment.
 
