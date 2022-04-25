@@ -24,7 +24,7 @@ MAZE_FILE = "Open_Maze.csv"
 
 font                    = cv.FONT_HERSHEY_SIMPLEX
 bottomLeftCornerOfText  = (10,HEIGHT-UHEIGHT//2)
-fontScale               = 0.5
+fontScale               = 1
 fontColor               = (255,255,255)
 thickness               = 2
 lineType                = 2
